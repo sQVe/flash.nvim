@@ -2,6 +2,9 @@ local Hacks = require("flash.hacks")
 
 local M = {}
 
+local CASE_SENSITIVE_FLAG = "\\C"
+local CASE_INSENSITIVE_FLAG = "\\c"
+
 function M.t(str)
   return vim.api.nvim_replace_termcodes(str, true, true, true)
 end
@@ -175,17 +178,42 @@ end
 ---@param case_options table Resolved case options with ignorecase and smartcase fields
 ---@return string Vim regex case flag (`\c` or `\C`)
 function M.get_case_flag(pattern, case_options)
-  local ok, ignore_case = pcall(M.should_ignore_case, pattern, case_options)
-
-  if not ok or type(ignore_case) ~= "boolean" then
-    return "\\C"
-  end
+  local ignore_case = M.should_ignore_case(pattern, case_options)
 
   if ignore_case then
-    return "\\c"
+    return CASE_INSENSITIVE_FLAG
   else
-    return "\\C"
+    return CASE_SENSITIVE_FLAG
   end
+end
+
+---@param opts table? Options table that may contain ignorecase and smartcase
+---@param mode_name string The mode name to get configuration for (e.g., "search", "treesitter_search")
+---@return table? Modified opts with case options resolved, or original opts if no case options provided
+function M.resolve_and_merge_case_options(opts, mode_name)
+  if not opts or (opts.ignorecase == nil and opts.smartcase == nil) then
+    return opts
+  end
+
+  local Config = require("flash.config")
+  local mode_config = Config.get(mode_name)
+
+  local runtime_overrides = {
+    ignorecase = opts.ignorecase,
+    smartcase = opts.smartcase,
+  }
+  local case_options = M.resolve_case_options(mode_config, runtime_overrides)
+
+  opts = vim.tbl_deep_extend("force", opts or {}, {
+    search = {
+      case_options = case_options,
+    },
+  })
+
+  opts.ignorecase = nil
+  opts.smartcase = nil
+
+  return opts
 end
 
 return M
