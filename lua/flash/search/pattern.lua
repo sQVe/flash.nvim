@@ -77,7 +77,7 @@ end
 function M._get(pattern, mode, case_options)
   local skip ---@type string?
   if type(mode) == "function" then
-    pattern, skip = mode(pattern)
+    pattern, skip = mode(pattern, case_options)
   elseif mode == "exact" then
     pattern, skip = M._exact(pattern, case_options)
   elseif mode == "fuzzy" then
@@ -118,15 +118,10 @@ function M._fuzzy(pattern, opts)
     return c == "\\" and "\\\\" or c
   end, vim.fn.split(pattern, "\\zs"))
 
-  -- Determine case sensitivity using smartcase logic if enabled
-  local ignore_case
-  if opts.smartcase and pattern:match("%u") then
-    ignore_case = false -- pattern contains uppercase, use case-sensitive
-  else
-    ignore_case = opts.ignorecase
-  end
+  local case_options = { ignorecase = opts.ignorecase, smartcase = opts.smartcase }
+  local case_flag = Util.get_case_flag(pattern, case_options)
 
-  local ret = "\\V" .. table.concat(chars, sep) .. (ignore_case and "\\c" or "\\C")
+  local ret = "\\V" .. table.concat(chars, sep) .. case_flag
   return ret, ret .. sep
 end
 
