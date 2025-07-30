@@ -102,4 +102,94 @@ function M.on_done(done, on_done)
   check:start(vim.schedule_wrap(fn))
 end
 
+---@param mode_config table? Mode configuration containing search.ignorecase and search.smartcase
+---@param runtime_overrides table? Runtime overrides containing ignorecase and smartcase
+---@return table Resolved case options with ignorecase and smartcase boolean values
+function M.resolve_case_options(mode_config, runtime_overrides)
+  local resolved = {}
+
+  -- Start with global Vim settings as base, with fallback defaults.
+  local ok_ic, ignorecase = pcall(function()
+    return vim.go.ignorecase
+  end)
+  local ok_sc, smartcase = pcall(function()
+    return vim.go.smartcase
+  end)
+  resolved.ignorecase = ok_ic and ignorecase or false
+  resolved.smartcase = ok_sc and smartcase or false
+
+  if mode_config and type(mode_config.search) == "table" then
+    if type(mode_config.search.ignorecase) == "boolean" then
+      resolved.ignorecase = mode_config.search.ignorecase
+    end
+    if type(mode_config.search.smartcase) == "boolean" then
+      resolved.smartcase = mode_config.search.smartcase
+    end
+  end
+
+  -- Apply runtime overrides if available and valid (highest precedence).
+  if runtime_overrides and type(runtime_overrides) == "table" then
+    if type(runtime_overrides.ignorecase) == "boolean" then
+      resolved.ignorecase = runtime_overrides.ignorecase
+    end
+    if type(runtime_overrides.smartcase) == "boolean" then
+      resolved.smartcase = runtime_overrides.smartcase
+    end
+  end
+
+  return resolved
+end
+
+---@param pattern string The search pattern to analyze
+---@param case_options table Resolved case options with ignorecase and smartcase fields
+---@return boolean True if case should be ignored, false if case-sensitive matching required
+function M.should_ignore_case(pattern, case_options)
+  if type(pattern) ~= "string" or not case_options or type(case_options) ~= "table" then
+    return false
+  end
+
+  if type(case_options.ignorecase) ~= "boolean" or type(case_options.smartcase) ~= "boolean" then
+    return false
+  end
+
+  -- If ignorecase is explicitly false, always be case-sensitive.
+  if not case_options.ignorecase then
+    return false
+  end
+
+  -- If smartcase is disabled, use ignorecase setting directly.
+  if not case_options.smartcase then
+    return case_options.ignorecase
+  end
+
+  -- If pattern contains uppercase, be case-sensitive.
+  local ok, has_upper = pcall(string.match, pattern, "%u")
+  if not ok then
+    return false
+  end
+
+  if has_upper then
+    return false
+  end
+
+  return true
+end
+
+---@param pattern string The search pattern to analyze
+---@param case_options table Resolved case options with ignorecase and smartcase fields
+---@return string Vim regex case flag (`\c` or `\C`)
+function M.get_case_flag(pattern, case_options)
+  local ok, ignore_case = pcall(M.should_ignore_case, pattern, case_options)
+
+  if not ok or type(ignore_case) ~= "boolean" then
+    return "\\C"
+  end
+
+  if ignore_case then
+    return "\\c"
+  else
+    return "\\C"
+  end
+end
+
 return M
