@@ -6,6 +6,7 @@ local Util = require("flash.util")
 ---@field skip string
 ---@field trigger string
 ---@field mode Flash.Pattern.Mode
+---@field case_options? {ignorecase: boolean, smartcase: boolean}
 ---@operator call:string Returns the input pattern
 local M = {}
 M.__index = M
@@ -15,10 +16,12 @@ M.__index = M
 ---@param pattern string
 ---@param mode Flash.Pattern.Mode
 ---@param trigger string
-function M.new(pattern, mode, trigger)
+---@param case_options? {ignorecase: boolean, smartcase: boolean}
+function M.new(pattern, mode, trigger, case_options)
   local self = setmetatable({}, M)
   self.mode = mode
   self.trigger = trigger or ""
+  self.case_options = case_options
   self:set(pattern or "")
   return self
 end
@@ -28,7 +31,7 @@ function M:__eq(other)
 end
 
 function M:clone()
-  return M.new(self.pattern, self.mode, self.trigger)
+  return M.new(self.pattern, self.mode, self.trigger, self.case_options)
 end
 
 function M:empty()
@@ -47,7 +50,7 @@ function M:set(pattern)
       if self.trigger ~= "" and pattern:sub(-1) == self.trigger then
         pattern = pattern:sub(1, -2)
       end
-      self.search, self.skip = M._get(pattern, self.mode)
+      self.search, self.skip = M._get(pattern, self.mode, self.case_options)
     end
     return false
   end
@@ -69,28 +72,42 @@ end
 
 ---@param pattern string
 ---@param mode Flash.Pattern.Mode
+---@param case_options? {ignorecase: boolean, smartcase: boolean}
 ---@private
-function M._get(pattern, mode)
+function M._get(pattern, mode, case_options)
   local skip ---@type string?
   if type(mode) == "function" then
     pattern, skip = mode(pattern)
   elseif mode == "exact" then
-    pattern, skip = M._exact(pattern)
+    pattern, skip = M._exact(pattern, case_options)
   elseif mode == "fuzzy" then
-    pattern, skip = M._fuzzy(pattern)
+    local opts = case_options
+        and {
+          ignorecase = case_options.ignorecase,
+          smartcase = case_options.smartcase,
+        }
+      or nil
+    pattern, skip = M._fuzzy(pattern, opts)
   end
   return pattern, skip or pattern
 end
 
 ---@param pattern string
-function M._exact(pattern)
-  return "\\V" .. pattern:gsub("\\", "\\\\")
+---@param case_options? {ignorecase: boolean, smartcase: boolean}
+function M._exact(pattern, case_options)
+  local escaped = "\\V" .. pattern:gsub("\\", "\\\\")
+  if case_options then
+    local case_flag = Util.get_case_flag(pattern, case_options)
+    return escaped .. case_flag
+  end
+  return escaped
 end
 
----@param opts? {ignorecase: boolean, whitespace:boolean}
+---@param opts? {ignorecase: boolean, smartcase: boolean, whitespace:boolean}
 function M._fuzzy(pattern, opts)
   opts = vim.tbl_deep_extend("force", {
     ignorecase = vim.go.ignorecase,
+    smartcase = vim.go.smartcase,
     whitespace = false,
   }, opts or {})
 
@@ -101,7 +118,15 @@ function M._fuzzy(pattern, opts)
     return c == "\\" and "\\\\" or c
   end, vim.fn.split(pattern, "\\zs"))
 
-  local ret = "\\V" .. table.concat(chars, sep) .. (opts.ignorecase and "\\c" or "\\C")
+  -- Determine case sensitivity using smartcase logic if enabled
+  local ignore_case
+  if opts.smartcase and pattern:match("%u") then
+    ignore_case = false -- pattern contains uppercase, use case-sensitive
+  else
+    ignore_case = opts.ignorecase
+  end
+
+  local ret = "\\V" .. table.concat(chars, sep) .. (ignore_case and "\\c" or "\\C")
   return ret, ret .. sep
 end
 

@@ -1,5 +1,4 @@
 local Hacks = require("flash.hacks")
-local require = require("flash.require")
 
 local M = {}
 
@@ -163,10 +162,7 @@ function M.should_ignore_case(pattern, case_options)
   end
 
   -- If pattern contains uppercase, be case-sensitive.
-  local ok, has_upper = pcall(string.match, pattern, "%u")
-  if not ok then
-    return false
-  end
+  local has_upper = string.match(pattern, "%u")
 
   if has_upper then
     return false

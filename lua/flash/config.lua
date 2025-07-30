@@ -153,6 +153,9 @@ local defaults = {
         -- `forward` will be automatically set to the search direction
         -- `mode` is always set to `search`
         -- `incremental` is set to `true` when `incsearch` is enabled
+        -- Override case sensitivity when global settings aren't appropriate.
+        -- ignorecase = nil, -- Set to true/false to override vim.go.ignorecase
+        -- smartcase = nil,  -- Set to true/false to override vim.go.smartcase
       },
     },
     -- options used when flash is activated through
@@ -203,7 +206,12 @@ local defaults = {
           -- [motion:match("%l") and motion:upper() or motion:lower()] = "prev",
         }
       end,
-      search = { wrap = false },
+      search = {
+        wrap = false,
+        -- Override case sensitivity when global settings aren't appropriate.
+        -- ignorecase = nil, -- Set to true/false to override vim.go.ignorecase
+        -- smartcase = nil,  -- Set to true/false to override vim.go.smartcase
+      },
       highlight = { backdrop = true },
       jump = {
         register = false,
@@ -226,7 +234,14 @@ local defaults = {
     },
     treesitter_search = {
       jump = { pos = "range" },
-      search = { multi_window = true, wrap = true, incremental = false },
+      search = {
+        multi_window = true,
+        wrap = true,
+        incremental = false,
+        -- Override case sensitivity when global settings aren't appropriate.
+        -- ignorecase = nil, -- Set to true/false to override vim.go.ignorecase
+        -- smartcase = nil,  -- Set to true/false to override vim.go.smartcase
+      },
       remote_op = { restore = true },
       label = { before = true, after = true, style = "inline" },
     },
