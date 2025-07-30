@@ -11,7 +11,13 @@ local Util = require("flash.util")
 local M = {}
 M.__index = M
 
----@alias Flash.Pattern.Mode "exact" | "fuzzy" | "search" | (fun(input:string):string,string?)
+---@alias Flash.Pattern.Mode "exact" | "fuzzy" | "regex" | "search" | (fun(input:string):string,string?)
+--- Pattern modes:
+--- - "exact": Matches the pattern literally (very nomagic mode \\V)
+--- - "fuzzy": Matches characters in order with flexible separators
+--- - "regex": Treats the pattern as a regular expression with case handling
+--- - "search": Default Vim search behavior
+--- - function: Custom pattern transformation function
 
 ---@param pattern string
 ---@param mode Flash.Pattern.Mode
@@ -88,6 +94,8 @@ function M._get(pattern, mode, case_options)
         }
       or nil
     pattern, skip = M._fuzzy(pattern, opts)
+  elseif mode == "regex" then
+    pattern, skip = M._regex(pattern, case_options)
   end
   return pattern, skip or pattern
 end
@@ -95,19 +103,59 @@ end
 ---@param pattern string
 ---@param case_options? {ignorecase: boolean, smartcase: boolean}
 function M._exact(pattern, case_options)
-  local escaped = "\\V" .. pattern:gsub("\\", "\\\\")
-  if case_options then
-    local case_flag = Util.get_case_flag(pattern, case_options)
-    return escaped .. case_flag
+  if type(pattern) ~= "string" then
+    return "\\V"
   end
-  return escaped
+
+  local escaped_pattern = pattern:gsub("\\", "\\\\")
+  if
+    case_options
+    and type(case_options) == "table"
+    and type(case_options.ignorecase) == "boolean"
+    and type(case_options.smartcase) == "boolean"
+  then
+    local case_flag = Util.get_case_flag(pattern, case_options)
+    return "\\V" .. case_flag .. escaped_pattern
+  end
+  return "\\V" .. escaped_pattern
+end
+
+--- Transforms a pattern for regex mode matching.
+--- In regex mode, the pattern is treated as a regular expression with optional case handling.
+--- Case flags (\\c or \\C) are prepended to control case sensitivity based on ignorecase/smartcase settings.
+---@param pattern string The regex pattern to transform
+---@param case_options? {ignorecase: boolean, smartcase: boolean} Optional case sensitivity options
+---@return string The transformed regex pattern with case flags if applicable
+function M._regex(pattern, case_options)
+  if type(pattern) ~= "string" then
+    return ""
+  end
+
+  if
+    case_options
+    and type(case_options) == "table"
+    and type(case_options.ignorecase) == "boolean"
+    and type(case_options.smartcase) == "boolean"
+  then
+    local case_flag = Util.get_case_flag(pattern, case_options)
+    return case_flag .. pattern
+  end
+  return pattern
 end
 
 ---@param opts? {ignorecase: boolean, smartcase: boolean, whitespace:boolean}
 function M._fuzzy(pattern, opts)
+  -- Safely get global vim settings with fallback defaults
+  local ok_ic, ignorecase = pcall(function()
+    return vim.go.ignorecase
+  end)
+  local ok_sc, smartcase = pcall(function()
+    return vim.go.smartcase
+  end)
+
   opts = vim.tbl_deep_extend("force", {
-    ignorecase = vim.go.ignorecase,
-    smartcase = vim.go.smartcase,
+    ignorecase = ok_ic and ignorecase or false,
+    smartcase = ok_sc and smartcase or false,
     whitespace = false,
   }, opts or {})
 
@@ -121,7 +169,7 @@ function M._fuzzy(pattern, opts)
   local case_options = { ignorecase = opts.ignorecase, smartcase = opts.smartcase }
   local case_flag = Util.get_case_flag(pattern, case_options)
 
-  local ret = "\\V" .. table.concat(chars, sep) .. case_flag
+  local ret = "\\V" .. case_flag .. table.concat(chars, sep)
   return ret, ret .. sep
 end
 

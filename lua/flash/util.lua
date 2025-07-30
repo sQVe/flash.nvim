@@ -187,7 +187,39 @@ function M.get_case_flag(pattern, case_options)
   end
 end
 
----@param opts table? Options table that may contain ignorecase and smartcase
+---@param opts table? Options table containing ignorecase and smartcase
+---@param mode_name string The mode name to get configuration for (e.g., "search", "treesitter_search")
+---@return table Resolved case options with ignorecase and smartcase fields
+function M.resolve_case_options_for_mode(opts, mode_name)
+  local Config = require("flash.config")
+  local mode_config = Config.get(mode_name)
+
+  local runtime_overrides = opts and {
+    ignorecase = opts.ignorecase,
+    smartcase = opts.smartcase,
+  } or nil
+
+  return M.resolve_case_options(mode_config, runtime_overrides)
+end
+
+---@param opts table Options table to modify (MODIFIED IN-PLACE)
+---@param case_options table Resolved case options to merge into opts
+---@return table The modified opts table with case options merged and ignorecase/smartcase removed
+function M.merge_case_options_into_opts(opts, case_options)
+  opts = vim.tbl_deep_extend("force", opts, {
+    search = {
+      case_options = case_options,
+    },
+  })
+
+  -- Remove runtime overrides after merging.
+  opts.ignorecase = nil
+  opts.smartcase = nil
+
+  return opts
+end
+
+---@param opts table? Options table that may contain ignorecase and smartcase (MODIFIED IN-PLACE if case options present)
 ---@param mode_name string The mode name to get configuration for (e.g., "search", "treesitter_search")
 ---@return table? Modified opts with case options resolved, or original opts if no case options provided
 function M.resolve_and_merge_case_options(opts, mode_name)
@@ -195,25 +227,8 @@ function M.resolve_and_merge_case_options(opts, mode_name)
     return opts
   end
 
-  local Config = require("flash.config")
-  local mode_config = Config.get(mode_name)
-
-  local runtime_overrides = {
-    ignorecase = opts.ignorecase,
-    smartcase = opts.smartcase,
-  }
-  local case_options = M.resolve_case_options(mode_config, runtime_overrides)
-
-  opts = vim.tbl_deep_extend("force", opts or {}, {
-    search = {
-      case_options = case_options,
-    },
-  })
-
-  opts.ignorecase = nil
-  opts.smartcase = nil
-
-  return opts
+  local case_options = M.resolve_case_options_for_mode(opts, mode_name)
+  return M.merge_case_options_into_opts(opts, case_options)
 end
 
 return M
