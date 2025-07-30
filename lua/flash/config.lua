@@ -294,7 +294,7 @@ function M.setup(opts)
   end
 end
 
----@param ... Flash.Config|Flash.State.Config|nil
+---@param ... Flash.Config|Flash.State.Config|string|nil
 ---@return Flash.State.Config
 function M.get(...)
   if options == nil then

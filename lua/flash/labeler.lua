@@ -176,11 +176,15 @@ function M:skip(win, labels)
     return {}
   end
 
+  local Util = require("flash.util")
+  local case_options = self.state.opts.search.case_options or Util.resolve_case_options()
+  local ignore_case = Util.should_ignore_case(pattern, case_options)
+
   vim.api.nvim_win_call(win, function()
     while #labels > 0 do
       -- this is needed, since an uppercase label would trigger smartcase
       local label_group = table.concat(labels, "")
-      if vim.go.ignorecase then
+      if ignore_case then
         label_group = label_group:lower()
       end
 
@@ -205,7 +209,7 @@ function M:skip(win, labels)
       labels = vim.tbl_filter(function(c)
         -- when ignorecase is set, we need to skip
         -- both the upper and lower case labels
-        if vim.go.ignorecase then
+        if ignore_case then
           return c:lower() ~= char:lower()
         end
         return c ~= char

@@ -18,6 +18,8 @@ local Util = require("flash.util")
 ---@field pattern? string
 ---@field labeler? fun(matches:Flash.Match[], state:Flash.State)
 ---@field actions? table<string, fun(state:Flash.State, char:string):boolean?>
+---@field ignorecase? boolean Runtime override for case sensitivity
+---@field smartcase? boolean Runtime override for smart case matching
 
 ---@class Flash.State
 ---@field win window
@@ -123,7 +125,8 @@ function M.new(opts)
   elseif self.matcher == nil then
     self.matcher = Search.new
   end
-  self.pattern = Pattern.new(self.opts.pattern, self.opts.search.mode, self.opts.search.trigger)
+  self.pattern =
+    Pattern.new(self.opts.pattern, self.opts.search.mode, self.opts.search.trigger, self.opts.search.case_options)
   self.visible = true
   self.cache = Cache.new(self)
   self.labeler = self.opts.labeler or require("flash.labeler").new(self):labeler()

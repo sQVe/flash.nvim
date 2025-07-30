@@ -152,7 +152,13 @@ end
 
 ---@param opts? Flash.Config
 function M.search(opts)
+  local mode_config = Config.get("treesitter_search")
+  local case_options = Util.resolve_case_options(mode_config, opts and opts.search)
+
   opts = Config.get({ mode = "treesitter_search" }, opts, {
+    search = {
+      case_options = case_options,
+    },
     matcher = function(win, _state, _opts)
       local Search = require("flash.search")
       local search = Search.new(win, _state)

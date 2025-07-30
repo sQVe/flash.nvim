@@ -45,6 +45,11 @@ function M.new()
     },
   }, M.motions[M.motion])
 
+  local mode_config = Config.get("char")
+  local case_options = Util.resolve_case_options(mode_config)
+
+  opts.search.case_options = case_options
+
   -- never show the current match label
   opts.highlight.groups.current = M.motion:lower() == "f" and opts.highlight.groups.label or opts.highlight.groups.match
 
@@ -71,7 +76,8 @@ end
 ---@param motion Flash.Char.Motion
 function M.mode(motion)
   ---@param c string
-  return function(c)
+  ---@param case_options? {ignorecase: boolean, smartcase: boolean}
+  return function(c, case_options)
     c = c:gsub("\\", "\\\\")
     local pattern ---@type string
     if motion == "t" then
@@ -81,6 +87,12 @@ function M.mode(motion)
     else
       pattern = "\\V" .. c
     end
+
+    if case_options then
+      local case_flag = Util.get_case_flag(c, case_options)
+      pattern = pattern .. case_flag
+    end
+
     if not Config.get("char").multi_line then
       local pos = vim.api.nvim_win_get_cursor(0)
       pattern = ("\\%%%dl"):format(pos[1]) .. pattern
